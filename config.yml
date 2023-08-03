@@ -1,0 +1,51 @@
+# Model configuration
+Model:
+  layer_num: 3
+  delta: 0.1
+  Layers:
+    - layer_index: 0
+      thickness: 
+        definition: "Constant"
+        values: 5
+        inversion: False
+      vs: 
+        definition: "Gradient"
+        values: [1.0, 2.0]
+        inversion: True
+        perturb_type: "Absolute"
+        perturb_params: [0.1, 0.1]
+      vp_derived_method: "Brocher2005"
+      rho_derived_method: "Brocher2005"
+    - layer_index: 1
+      thickness: 
+        definition: "Constant"
+        values: 15
+        inversion: False
+      vs: 
+        definition: "Bspline"
+        values: [2.4, 2.8, 3.3, 3.0]
+        inversion: True
+        perturb_type: "Absolute"
+        perturb_params: [0.1, 0.1, 0.1]
+      vp_derived_method: "Brocher2005"
+      rho_derived_method: "Brocher2005"
+    - layer_index: 2
+      thickness: 
+        definition: "Constant"
+        values: 20
+        inversion: False
+      vs: 
+        definition: "Constant"
+        values: 3.8
+        inversion: False
+      vp_derived_method: "Brocher2005"
+      rho_derived_method: "Brocher2005"
+
+# Inversion hyperparameters
+Inversion:
+  prior_method: "Uniform" # "Uniform" or "Normal"
+  ndraws: 50000
+  nburn: 10000
+  tune_interval: 100
+  tune_interval: 4
+  chains: 4

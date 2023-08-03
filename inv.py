@@ -2,7 +2,7 @@
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
 Date: 2023-07-25 09:57:48
-LastEditTime: 2023-08-03 15:52:21
+LastEditTime: 2023-08-03 16:10:10
 LastEditors: Mengjie Zheng
 Description: 
 FilePath: /Projects/Alaska.Proj/Inversion/comply_inv_master/inv.py
@@ -95,7 +95,7 @@ class ComplyLogLikelihood(at.Op):
             # Gradient must be positive
             definition_key = layer.vs.get("definition")
             if definition_key == "Gradient":
-                if new_vel_values[0] < new_vel_values[1]:
+                if new_vel_values[0] > new_vel_values[1]:
                     return False
                 
             if prev_end_value is not None and prev_end_value > new_vel_values[0]:

@@ -2,10 +2,10 @@
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
 Date: 2023-07-23 09:59:39
-LastEditTime: 2023-08-02 13:42:32
+LastEditTime: 2024-01-24 22:52:42
 LastEditors: Mengjie Zheng
 Description: 
-FilePath: /Projects/Alaska.Proj/Inversion/comply_inv_master/model.py
+FilePath: /Projects/Alaska.Proj/inv_inversion/MC_Compliance-dev/model.py
 '''
 
 import yaml
@@ -76,12 +76,12 @@ class BsplineBase:
         plt.savefig("bspline.png")
 
 class Params:
-    def __init__(self, definition, values, inversion, perturb_type=None, perturb_params=None):
+    def __init__(self, definition, values, inversion, perturb_type=None, perturb_values=None):
         self.definition = definition 
         self.values = values
         self.inversion = inversion
         self.perturb_type = perturb_type
-        self.perturb_params = perturb_params
+        self.perturb_values = perturb_values
     
     def to_dict(self):
         return vars(self)
@@ -91,12 +91,72 @@ class Params:
     
     def update_values(self, new_values):
         self.values = new_values
-    
-class Layer:
-    def __init__(self, layer_index, thickness: Type[Params], delta):
+        
+class GLayer:
+    def __init__(self, layer_index, thickness: Type[Params], delta, vs, vp, rho):
         self.layer_index = layer_index
         self.thickness = thickness
         self.delta = delta
+        self.vs = vs
+        self.vp = vp
+        self.rho = rho
+    
+    def to_dict(self):
+        layer_dict = {}
+        for key, value in vars(self).items():
+            if hasattr(value, 'to_dict'):  # Check if the attribute has a to_dict method
+                layer_dict[key] = value.to_dict()
+            else:
+                layer_dict[key] = value
+        return layer_dict
+
+    def discrete(self):
+        n = np.maximum(10, int(self.thickness.get("values") / self.delta))
+        depths = np.linspace(0, self.thickness.get("values"), n + 1)
+
+        seis_params = {"vs": self.vs, "vp": self.vp, "rho": self.rho}
+        seis_values = {"vs": None, "vp": None, "rho": None}
+
+        for key, param in seis_params.items():
+            if isinstance(param, Params):
+                layer_type = param.get("definition")
+                if layer_type == "Constant":
+                    seis_values[key] = np.ones(n + 1) * param.get("values")
+                elif layer_type == "Gradient":
+                    seis_values[key] = np.linspace(param.get("values")[0], param.get("values")[1], n + 1)
+                elif layer_type == "Bspline":
+                    bs = BsplineBase(depths, len(param.get("values")))
+                    seis_values[key] = bs * param.get("values")
+            else:
+                seis_values[key] = param
+        
+        return depths, seis_values
+    
+    def create_model(self):
+        depths, seis_values = self.discrete()
+        if isinstance(self.vs, Params):
+            vsi = seis_values["vs"]
+        if isinstance(self.vp, Params):
+            vpi = seis_values["vp"]
+        else:
+            vpi = VpEstimate(z=depths, vs=vsi).estimate(seis_values["vp"])
+        if isinstance(self.rho, Params):
+            rhoi = seis_values["rho"]
+        else:
+            rhoi = RhoEstimate(z=depths, vs=vsi, vp=vpi).estimate(seis_values["rho"])
+        return depths, vsi, vpi, rhoi
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            attribute = getattr(self, key, None)
+            if isinstance(attribute, Params):
+                attribute.update_values(value)
+           
+class Layer:
+    def __init__(self, layer_index, thickness: Type[Params], delta, layer_type=None):
+        self.layer_index = layer_index
+        self.thickness = thickness
+        self.delta = delta
+        self.layer_type = layer_type
     
     def to_dict(self):
         layer_dict = vars(self)
@@ -106,7 +166,7 @@ class Layer:
 class VsLayer(Layer):
     def __init__(self, layer_index, thickness, delta, vs: Type[Params], 
                  vp_derived_method=None, rho_derived_method=None):
-        super().__init__(layer_index, thickness, delta)
+        super().__init__(layer_index, thickness, delta, layer_type="Vs")
         self.vs = vs
         self.vp_derived_method = vp_derived_method
         self.rho_derived_method = rho_derived_method
@@ -117,12 +177,7 @@ class VsLayer(Layer):
         return vs_layer_dict
     
     def discrete(self):
-        if self.thickness.get("values") < 2.0:
-            delta = 0.1
-        else:
-            delta = self.delta
-
-        n = int(self.thickness.get("values") / delta)
+        n = np.maximum(10, int(self.thickness.get("values") / self.delta))
         depths = np.linspace(0, self.thickness.get("values"), n + 1)
 
         layer_type = self.vs.get("definition")
@@ -161,6 +216,9 @@ class VpEstimate:
         elif keyword == "Christensen&Shaw1970":
             self.method = keyword
             return self._christensen_shaw()
+        elif type(keyword) == int or type(keyword) == float:
+            self.method = "Constant"
+            return self._constant(keyword)
         else:
             raise ValueError("Unknown keyword")
     
@@ -177,6 +235,9 @@ class VpEstimate:
 
     def _christensen_shaw(self):
         return 1.511 + 1.304 * self.z - 0.741 * self.z ** 2 + 0.257 * self.z ** 3
+    
+    def _constant(self, value):
+        return self.vs * value
     
 class RhoEstimate:
     def __init__(self, z=None, vs=None, vp=None, method: str=None):
@@ -270,16 +331,24 @@ class RhoEstimate:
         return 1.85 + 0.165 * self.vp
     
     def _constant(self, value):
-        return np.ones_like(self.vp) * value
-    
+        return np.ones_like(self.vp) * value    
+
 class Model:  
-    def __init__(self, layer_num, layers: List):
+    def __init__(self, layer_num, layers: List, total_thickness=None):
         self.layer_num = layer_num
         self.layers = layers
+        self.total_thickness = total_thickness
 
         if layer_num != len(layers):
             raise ValueError("The number of layers is not equal to layer_num")
-    
+
+    def adjust_last_layer_thickness(self):
+        totoal_other_layers_thickness = sum([layer.thickness.get("values") for layer in self.layers[:-1]])
+        last_layer_thickness = self.total_thickness - totoal_other_layers_thickness
+        if last_layer_thickness < 0:
+            raise ValueError("The total thickness is smaller than the sum of other layers")
+        self.layers[-1].thickness.update_values(last_layer_thickness)
+        
     def combine_layers(self, boundary_flag=False):
         combined_z = []
         combined_vs = []
@@ -306,7 +375,12 @@ class Model:
 
             accumulated_depth += layer.thickness.get("values")
         
-        return combined_z, combined_vs, combined_vp, combined_rho
+        
+        # For simplicity, we assume that there is no negative gradient in Vp and density
+        combined_vp = np.maximum.accumulate(combined_vp)
+        combined_rho = np.maximum.accumulate(combined_rho)
+
+        return np.array(combined_z), np.array(combined_vs), combined_vp, combined_rho
     
     def to_layer_model(self):
         z, vs, vp, rho = self.combine_layers()
@@ -321,7 +395,7 @@ class Model:
     def plot(self, save_flag=False, save_path=None):
         z, vs, vp, rho = self.combine_layers(boundary_flag=True)
         fig, ax = plt.subplots(1, 3, figsize=(6, 4) ,sharey=True)
-        ax[0].plot(vs, z, 'k')
+        ax[0].plot(vs, z, '-o', c='k')
         ax[0].set_xlabel('Vs (km/s)')
         ax[0].set_ylabel('Depth (km)')
         ax[0].invert_yaxis()
@@ -344,23 +418,33 @@ class Model:
             config = yaml.safe_load(file)
         model_config = config['Model']
         layers_config = model_config['Layers']
-        layers = [
-            VsLayer(
-                layer_index=layer['layer_index'],
-                delta=layer['delta'],
-                thickness=Params(**layer['thickness']),
-                vs=Params(**layer['vs']),
-                vp_derived_method=layer['vp_derived_method'],
-                rho_derived_method=layer['rho_derived_method']
-            ) for layer in layers_config
-        ]
-        return Model(layer_num=model_config['layer_num'], layers=layers)
+        layers = []
+        for layer_data in layers_config:
+            properties = ["vs", "vp", "rho", "thickness"]
+            properties_dict = {}
+            for prop in properties:
+                if isinstance(layer_data[prop], dict):
+                    properties_dict[prop] = Params(**layer_data[prop])
+                else:
+                    properties_dict[prop] = layer_data[prop]
+            layer = GLayer(
+                layer_index=layer_data['layer_index'],
+                thickness=properties_dict['thickness'],
+                delta=layer_data['delta'],
+                vs=properties_dict['vs'],
+                vp=properties_dict['vp'],
+                rho=properties_dict['rho']
+            )
+            layers.append(layer)
+
+        return Model(layer_num=model_config['layer_num'], layers=layers, total_thickness=model_config['total_thickness'])
 
     def to_yaml(self, file_path):
         model_config = {
             'Model': {
                 'layer_num': self.layer_num,
-                'Layers': [layer.to_dict() for layer in self.layers]
+                'Layers': [layer.to_dict() for layer in self.layers],
+                'total_thickness': self.total_thickness
             }
         }
         with open(file_path, 'w') as file:
@@ -372,27 +456,21 @@ class Model:
     def to_dict(self):
         return {
             'layer_num': self.layer_num,
-            'layers': [layer.to_dict() for layer in self.layers]
-        }  
-if __name__ == '__main__':
-    # vs0 = Params(definition="Gradient", values=[0.5, 2.0], inversion=True, 
-    #              perturb_type="Percent", perturb_params=[0.1, 0.1])
-    # thickness0 = Params(definition="Constant", values=5, inversion=False)
-    # vslayer0  = VsLayer(layer_index=0, thickness=thickness0, delta=0.2, vs=vs0,
-    #                     vp_derived_method="Brocher2005", rho_derived_method="Brocher2005")
-    # model = Model(layer_num=1, layers=[vslayer0])
-    # print(model.to_layer_model())
-    # model.plot(save_flag=True, save_path="/Users/mengjie/Projects/Alaska.Proj/Inversion/comply_inv/test.png")
-    # model = Model.from_yaml("/Volumes/Tect32TB/Mengjie/Alaska.Data/COMPL_INV/II/DATA/XO.LA21/config.yml")
-    # print(model.to_layer_model())
-    # model.plot(save_flag=True, save_path="Alaska.Proj/Inversion/comply_inv_master/demo.png")
+            'layers': [layer.to_dict() for layer in self.layers],
+            'total_thickness': self.total_thickness
+        }
 
-    # print(model.layers[0].thickness.get("values"))
-    # print(model.layers[0].vs.get("values"))
-    # model_copy = model.clone()
-    # print(model_copy.layers[0])
-    # model_copy.layers[0].update(10, [0.333, 2.333])
-    # print(model_copy.layers[0].thickness.get("values"))
-    # print(model_copy.layers[0].vs.get("values"))
-    # model_copy.to_yaml("Alaska.Proj/Inversion/comply_inv_master/config_copy.yml")
-    model = Model.from_yaml("/Volumes/Tect32TB/Mengjie/Alaska.Data/COMPL_INV/II/DATA/XO.LA21/config.yml")
+
+if __name__ == '__main__':
+    thickness0 = Params(definition="Constant", values=0.79, inversion=False)
+    vs0 = Params(definition="Gradient", values=[0.5, 2.0], inversion=True, 
+                 perturb_type="Percent", perturb_values=[0.1, 0.1])
+    layer0 = GLayer(layer_index=0, thickness=thickness0, delta=0.1, vp=2.0, vs=vs0, rho=1.70)
+    thickness1 = Params(definition="Constant", values=None, inversion=False)
+    vs1 = Params(definition="Bspline", values=[2.5, 2.0, 3.0, 3.5], inversion=True, 
+                 perturb_type="Percent", perturb_values=[0.1, 0.1, 0.1, 0.1])
+    layer1 = GLayer(layer_index=1, thickness=thickness1, delta=0.1, vp=2.0, vs=vs1, rho=1.70)
+    model = Model(layer_num=2, layers=[layer0, layer1], total_thickness=5.0)
+    z, vs, vp, rho = model.combine_layers(boundary_flag=True)
+    print(z)
+    model.plot(save_flag=True, save_path="/Users/mengjie/Projects/Alaska.Proj/inv_inversion/MC_Compliance-dev/model.png")

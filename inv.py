@@ -2,10 +2,10 @@
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
 Date: 2023-10-09 10:19:01
-LastEditTime: 2024-01-30 10:59:27
+LastEditTime: 2024-04-20 11:50:04
 LastEditors: Mengjie Zheng
 Description: 
-FilePath: /Projects/Alaska.Proj/inv_inversion/MC_Compliance-dev/inv.py
+FilePath: /Projects/Alaska.Proj/MCMC_Compliance/inv.py
 Refer to: https://www.pymc.io/projects/examples/en/latest/samplers/MLDA_gravity_surveying.html
 
 '''
@@ -16,8 +16,7 @@ import pymc as pm
 import pytensor.tensor as pt
 import arviz as az
 from model import Model, Params
-from forward_funcs.ncomp_fortran import ncomp_fortran
-from forward_funcs.utils import cal_Ps_delay
+from compliance import ncomp_fortran, cal_Ps_delay
 
 
 

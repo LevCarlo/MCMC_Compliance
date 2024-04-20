@@ -2,21 +2,22 @@
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
 Date: 2023-10-09 12:31:24
-LastEditTime: 2024-01-15 14:03:49
+LastEditTime: 2024-04-20 11:50:48
 LastEditors: Mengjie Zheng
 Description: 
-FilePath: /Projects/Alaska.Proj/inv_inversion/MC_Compliance-dev/run.py
+FilePath: /Projects/Alaska.Proj/MCMC_Compliance/scripts/run.py
 '''
-import os
 import sys
+sys.path.append('/Users/mengjie/Projects/Alaska.Proj/MCMC_Compliance')
+
+import os
 import glob
 import numpy as np
 import re
 from model import Model, Params
 from inv import Comply_Ps_LogLike, InversionMC
 from tqdm import tqdm
-from forward_funcs.ncomp_fortran import ncomp_fortran
-from forward_funcs.utils import cal_Ps_delay
+from compliance import ncomp_fortran, cal_Ps_delay
 import xarray as xr
 import arviz as az
 import time

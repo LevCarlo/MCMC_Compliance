@@ -1,14 +1,12 @@
 '''
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
-Date: 2023-10-09 10:17:01
-LastEditTime: 2023-10-09 10:18:04
+Date: 2024-04-19 19:30:35
+LastEditTime: 2024-04-19 19:30:40
 LastEditors: Mengjie Zheng
 Description: 
-FilePath: /Projects/Alaska.Proj/inv_inversion/MC_Compliance/forward_funcs/utils.py
+FilePath: /Projects/Alaska.Proj/MCMC_Compliance/compliance/forward_funcs/cal_Ps_delay.py
 '''
-
-
 def cal_Ps_delay(vs, vp, h):
     """
     vs: Average S-wave velocity of the sedimentary layer

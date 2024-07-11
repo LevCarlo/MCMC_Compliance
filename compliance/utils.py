@@ -2,7 +2,7 @@
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
 Date: 2024-04-19 19:31:09
-LastEditTime: 2024-04-19 21:15:25
+LastEditTime: 2024-05-05 11:01:19
 LastEditors: Mengjie Zheng
 Description: 
 FilePath: /Projects/Alaska.Proj/MCMC_Compliance/compliance/utils.py
@@ -21,7 +21,7 @@ def resample(thickness, parameters, dz):
     parameters : numpy.ndarray
         Seismic parameters to resample
     dz : float
-        Maximum thickness of the layer, in km
+        Maximum thickness of the layer, in m
 
     Returns
     -------

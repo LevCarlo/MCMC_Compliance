@@ -1,0 +1,69 @@
+Model:
+  layer_num: 2
+  Layers:
+  - layer_index: 0
+    thickness:
+      definition: Constant
+      values: 0.75
+      inversion: true
+      perturb_type: Percent
+      perturb_values: 100
+    delta: 0.1
+    vs:
+      definition: Gradient
+      values:
+      - 0.2
+      - 0.8
+      inversion: true
+      perturb_type: Absolute
+      perturb_values:
+      - 1.0
+      - 1.0
+    vp:
+      definition: Gradient
+      values:
+      - 2.5
+      - 2.5
+      inversion: true
+      perturb_type: Percent
+      perturb_values:
+      - 100
+      - 100
+    rho: 2.0
+  - layer_index: 1
+    thickness:
+      definition: Constant
+      values: 2.25
+      inversion: false
+      perturb_type: null
+      perturb_values: null
+    delta: 0.2
+    vs:
+      definition: Bspline
+      values:
+      - 1.5
+      - 1.5
+      - 2.0
+      - 3.0
+      inversion: true
+      perturb_type: Percent
+      perturb_values:
+      - 100
+      - 100
+      - 100
+      - 50
+    vp: Brocher2005
+    rho: 2.8
+  total_thickness: 3.0
+Inversion:
+  sampling_method: NUTS
+  prior_method: Uniform
+  ndraws: 20000
+  nburn: 10000
+  tune_interval: 100
+  cores: 4
+  chains: 10
+Joint_Inversion:
+  weight:
+  - 1.0
+  - 10

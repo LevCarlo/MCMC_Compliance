@@ -2,10 +2,10 @@
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
 Date: 2023-07-23 09:59:39
-LastEditTime: 2024-01-24 22:52:42
+LastEditTime: 2024-06-10 10:18:02
 LastEditors: Mengjie Zheng
 Description: 
-FilePath: /Projects/Alaska.Proj/inv_inversion/MC_Compliance-dev/model.py
+FilePath: /Projects/Alaska.Proj/MCMC_Compliance/model.py
 '''
 
 import yaml
@@ -473,4 +473,3 @@ if __name__ == '__main__':
     model = Model(layer_num=2, layers=[layer0, layer1], total_thickness=5.0)
     z, vs, vp, rho = model.combine_layers(boundary_flag=True)
     print(z)
-    model.plot(save_flag=True, save_path="/Users/mengjie/Projects/Alaska.Proj/inv_inversion/MC_Compliance-dev/model.png")

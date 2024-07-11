@@ -1,13 +1,3 @@
-'''
-Author: Mengjie Zheng
-Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
-Date: 2024-06-10 11:19:39
-LastEditTime: 2024-06-20 11:48:30
-LastEditors: Mengjie Zheng
-Description: 
-FilePath: /Projects/Alaska.Proj/MCMC_Compliance/run.py
-'''
-
 import os
 import sys
 sys.path.append('/Users/mengjie/Projects/Alaska.Proj/MCMC_Compliance')
@@ -19,8 +9,10 @@ import xarray as xr
 from tqdm import tqdm
 import time
 from model import Model, Params
+import arviz as az
 from inv import InversionMC, Comply_Ps_LogLike
 from post import ComplyMisfit, PsMisfit
+from utils import update_model
 
 net = "XO"
 sta = sys.argv[1]
@@ -34,23 +26,7 @@ invdir  = os.path.join(datadir, "COMPLY_INV", "DATA")
 comply_data_filepath = glob.glob(os.path.join(invdir, f"{net}.{sta}", "*m.dat"))
 p2s_data_filepath = glob.glob(os.path.join(invdir, f"{net}.{sta}", "*P2S.dat"))
 config_filepath = os.path.join(invdir, f"{net}.{sta}", "config.yml")
-# =============================================================================
-
-def update_model(model, inpara):
-    model_copy = model.clone()
-    param_index = 0
-    for i, layer in enumerate(model_copy.layers):
-        new_params = {}
-        for attr_name in ["vs", "vp", "rho"]:
-            param = getattr(layer, attr_name)
-            if isinstance(param, Params):
-                length = len(param.values)
-                new_params[attr_name] = inpara[param_index:param_index+length]
-                param_index += length
-        new_params["thickness"] = inpara[param_index]
-        param_index += 1
-        layer.update(**new_params)
-    return model_copy
+trace_filepath = os.path.join(invdir, f"{net}.{sta}", "trace.nc")
 
 def post_process(trace, model, comply_data, p2s_data, wdepth, weight):
     # num_chains = len(trace.posterior['chain'])
@@ -162,7 +138,7 @@ def post_process(trace, model, comply_data, p2s_data, wdepth, weight):
             "joint_chiSqr": joint_chiSqr_dataarray})
         return ds
 
-def main(inverse_flag=True):
+def main():
     # Load data
     comply_data = np.loadtxt(comply_data_filepath[0])
     if len(p2s_data_filepath) <= 0:
@@ -175,54 +151,19 @@ def main(inverse_flag=True):
 
     # load model, inversion configuration
     model = Model.from_yaml(config_filepath)
-    inv = InversionMC.from_yaml(config_filepath)
-
-    # load weights for joint inversion
     with open(config_filepath, "r") as f:
         config = yaml.safe_load(f)
     joint_hparams = config["Joint_Inversion"]
     weight = joint_hparams["weight"]
 
-    # build likelihood
-    if inverse_flag:
-        likelihood = Comply_Ps_LogLike(model=model, 
-                                       wdepth=wdepth,
-                                       comply_data=comply_data, 
-                                       p2s_data=p2s_data,
-                                       weight=weight,
-                                       inverse=True)
-    else:
-        likelihood = Comply_Ps_LogLike(model=model, 
-                                       wdepth=wdepth,
-                                       comply_data=comply_data, 
-                                       p2s_data=p2s_data,
-                                       weight=weight,
-                                       inverse=False)
-    
-    inv.likelihood = likelihood
-    inv.model = model
+    trace = az.from_netcdf(trace_filepath)
 
-    # run inversion
-    trace = inv.perform()
-    if inverse_flag:
-        trace.to_netcdf(os.path.join(invdir, f"{net}.{sta}", "trace.nc"))
-    else:
-        trace.to_netcdf(os.path.join(invdir, f"{net}.{sta}", "trace_prior.nc"))
-
-    # calculate misfit and chiSqr
-    if inverse_flag:
-        ds = post_process(trace, model, comply_data, p2s_data, wdepth, weight)
-        ds.to_netcdf(os.path.join(invdir, f"{net}.{sta}", "posterior_raw.nc"))
+    ds = post_process(trace, model, comply_data, p2s_data, wdepth, weight)
+    ds.to_netcdf(os.path.join(invdir, f"{net}.{sta}", "posterior_raw.nc"))
 
 if __name__ == "__main__":
     tbegin = time.time()
-    main(inverse_flag=False)
-    main(inverse_flag=True)
+    main()
     tend = time.time()
-    elapse_time = (tend - tbegin) / 3600
-    print("Elapsed time: %.2f hours" % elapse_time)
-
-
-
-
-
+    elapsed = (tend - tbegin) / 3600
+    print(f"Elapsed time: {elapsed} hours")

@@ -2,14 +2,14 @@
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
 Date: 2024-04-19 16:00:31
-LastEditTime: 2024-04-20 11:17:22
+LastEditTime: 2024-04-22 09:05:54
 LastEditors: Mengjie Zheng
 Description: Calculate the sensitivity of compliance to the different seismic parameters
 FilePath: /Projects/Alaska.Proj/MCMC_Compliance/compliance/sensitivity.py
 '''
 import numpy as np
-from forward_funcs.ncomp_fortran import ncomp_fortran
-from utils import resample
+from .forward_funcs import ncomp_fortran
+from .utils import resample
 import matplotlib.pyplot as plt
 
 class ComplianceSensitivity():
@@ -72,7 +72,7 @@ class ComplianceSensitivity():
             # Using central relative difference
             kernel[i] = (c_plus[0] - c_minus[0]) / (2 * c0[0] * self.dp)
         
-        return cumulative_thickness, kernel
+        return cumulative_thickness[:-1], kernel[:-1]
 
 if __name__ == "__main__":
     model = np.array([160, 2.5, 6.0, 3.5] * 55).reshape(-1, 4)

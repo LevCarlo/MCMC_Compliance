@@ -1,2 +1,7 @@
 *.pyc
 __pycache__/
+scripts/
+*.lst
+*.log
+test*
+*v0*

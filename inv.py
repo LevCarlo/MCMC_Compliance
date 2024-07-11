@@ -2,7 +2,7 @@
 Author: Mengjie Zheng
 Email: mengjie.zheng@colorado.edu;zhengmengjie18@mails.ucas.ac.cn
 Date: 2023-10-09 10:19:01
-LastEditTime: 2024-04-20 11:50:04
+LastEditTime: 2024-06-20 11:38:08
 LastEditors: Mengjie Zheng
 Description: 
 FilePath: /Projects/Alaska.Proj/MCMC_Compliance/inv.py
@@ -195,6 +195,7 @@ class Comply_Ps_LogLike(pt.Op):
                 return
             
             chiSqr_comply = np.sum(((ncomp - ncomp_pred) / ncomp_err) ** 2)
+            # print(chiSqr_comply)
             w0 = self.weight[0]
         else:
             chiSqr_comply = 0.0
@@ -217,9 +218,9 @@ class Comply_Ps_LogLike(pt.Op):
                 return
             
             p2s, p2s_err = self.p2s_data[0], self.p2s_data[1]
-            chiSqr_p2s = ((p2s - p2s_pred) / p2s_err) ** 2
-            if chiSqr_p2s > 10:
-                chiSqr_p2s = np.sqrt(10 * chiSqr_p2s)
+            chiSqr_p2s = np.sum(((p2s - p2s_pred) / p2s_err) ** 2)
+            # if chiSqr_p2s > 10:
+            #     chiSqr_p2s = np.sqrt(10 * chiSqr_p2s)
             w1 = self.weight[1]
         else:
             chiSqr_p2s = 0.0
@@ -260,8 +261,8 @@ class Comply_Ps_LogLike(pt.Op):
         _, vs, vp, _ = sediment_layer.create_model()
         if np.any(vp > 4.0):
             return False
-        vsi, vpi = np.average(vs), np.average(vp)
-        if vpi/vsi < 1.70 or vpi/vsi > 15.0:
+        vp2vs = vp / vs
+        if np.any(vp2vs < 1.70) or np.any(vp2vs > 15.0):
             return False
         if sediment_layer.vs.definition == "Gradient":
             vs = sediment_layer.vs.values
@@ -272,6 +273,13 @@ class Comply_Ps_LogLike(pt.Op):
                 vp = sediment_layer.vp.values
                 if vp[0] > vp[1]:
                     return False
+        
+        # crust layer
+        crust_layer = model.layers[1]
+        _, vs, _, _ = crust_layer.create_model()
+        vs_grad = np.diff(vs)
+        if np.any(vs_grad < 0):
+            return False
 
         try:
             z, vs, vp, rho = model.combine_layers(boundary_flag=True)
@@ -285,6 +293,7 @@ class Comply_Ps_LogLike(pt.Op):
            np.any(rho <= 0) or np.any(np.isnan(rho)):
             return False
         
+        # Check the boundary condition, the vs and vp must be increasing
         _, inverse_indices, counts = np.unique(z, return_inverse=True, return_counts=True)
         duplicate_indices = np.where(counts[inverse_indices] > 1)[0]
         
